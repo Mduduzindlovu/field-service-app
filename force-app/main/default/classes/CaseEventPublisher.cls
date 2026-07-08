@@ -20,7 +20,8 @@ public with sharing class CaseEventPublisher {
                 Case old = oldMap.get(c.Id);
                 if (c.Status != old.Status
                     || c.Assigned_Technician__c != old.Assigned_Technician__c
-                    || c.Scheduled_Date__c != old.Scheduled_Date__c) {
+                    || c.Scheduled_Date__c != old.Scheduled_Date__c
+                    || c.Locations__c != old.Locations__c) {
                     caseIdsToPublish.add(c.Id);
                 }
             }
@@ -33,7 +34,7 @@ public with sharing class CaseEventPublisher {
         List<Case> enriched = [
             SELECT Id, CaseNumber, Subject, Status,
                    Assigned_Technician__c, Assigned_Technician__r.Name,
-                   Scheduled_Date__c,
+                   Scheduled_Date__c, LastModifiedDate,
                    Locations__c, Locations__r.Name,
                    Locations__r.Coordinates__Latitude__s,
                    Locations__r.Coordinates__Longitude__s
@@ -44,19 +45,20 @@ public with sharing class CaseEventPublisher {
         List<CaseStatusChanged__e> events = new List<CaseStatusChanged__e>();
         for (Case c : enriched) {
             CaseStatusChanged__e evt = new CaseStatusChanged__e();
-            evt.Case_Id__c               = c.Id;
-            evt.Case_Number__c           = c.CaseNumber;
-            evt.Subject__c               = c.Subject;
-            evt.Status__c                = c.Status;
+            evt.Case_Id__c                  = c.Id;
+            evt.Case_Number__c              = c.CaseNumber;
+            evt.Subject__c                  = c.Subject;
+            evt.Status__c                   = c.Status;
             evt.Assigned_Technician_Id__c   = c.Assigned_Technician__c;
             evt.Assigned_Technician_Name__c =
                 c.Assigned_Technician__r != null ? c.Assigned_Technician__r.Name : null;
-            evt.Scheduled_Date__c        = c.Scheduled_Date__c;
-            evt.Location_Name__c         =
+            evt.Scheduled_Date__c           = c.Scheduled_Date__c;
+            evt.Last_Modified_Date__c       = c.LastModifiedDate;
+            evt.Location_Name__c            =
                 c.Locations__r != null ? c.Locations__r.Name : null;
-            evt.Latitude__c              =
+            evt.Latitude__c                 =
                 c.Locations__r != null ? c.Locations__r.Coordinates__Latitude__s : null;
-            evt.Longitude__c             =
+            evt.Longitude__c                =
                 c.Locations__r != null ? c.Locations__r.Coordinates__Longitude__s : null;
             events.add(evt);
         }

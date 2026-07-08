@@ -103,4 +103,28 @@ private class CaseEventPublisherTest {
         System.assertEquals(5, events.size(),
             'Expected exactly 1 event per updated Case, got ' + events.size());
     }
+
+    @isTest
+    static void publishesEventOnLocationChange() {
+        Locations__c loc = [SELECT Id FROM Locations__c LIMIT 1];
+
+        // Create a second location to reassign the case to
+        Locations__c loc2 = new Locations__c(
+            Name = 'New Site',
+            Coordinates__Latitude__s = -33.8000,
+            Coordinates__Longitude__s = 18.5000
+        );
+        insert loc2;
+
+        Case c = [SELECT Id FROM Case LIMIT 1];
+
+        Test.startTest();
+        c.Locations__c = loc2.Id;
+        update c;
+        Test.stopTest();
+
+        List<CaseStatusChanged__e> events = CaseEventPublisher.publishedEvents;
+        System.assertEquals(1, events.size(), 'Expected 1 event on location change');
+        System.assertEquals('New Site', events[0].Location_Name__c);
+    }
 }
