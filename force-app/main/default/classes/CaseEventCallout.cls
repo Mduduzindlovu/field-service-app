@@ -40,7 +40,7 @@ public with sharing class CaseEventCallout implements Queueable, Database.Allows
 
         for (CaseStatusChanged__e evt : events) {
             String payload = buildPayload(evt);
-            String errorMsg = sendPayload(
+            String errorMsg = SyncCalloutUtil.sendPayload(
                 payload, config.Endpoint_URL__c, config.Sync_Secret__c);
 
             if (errorMsg != null) {
@@ -81,24 +81,4 @@ public with sharing class CaseEventCallout implements Queueable, Database.Allows
         return JSON.serialize(payload);
     }
 
-    // Returns null on success, error message string on failure
-    private String sendPayload(String payload, String endpointUrl, String secret) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(endpointUrl);
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('x-sync-secret', secret);
-        req.setBody(payload);
-
-        try {
-            HttpResponse res = new Http().send(req);
-            if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
-                return null;
-            }
-            return 'HTTP ' + res.getStatusCode() + ': '
-                + res.getBody().abbreviate(200);
-        } catch (Exception e) {
-            return e.getMessage().abbreviate(255);
-        }
-    }
 }

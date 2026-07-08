@@ -58,12 +58,14 @@ private class CaseEventRetrySchedulerTest {
         Test.stopTest();
 
         Sync_Failure__c updated = [
-            SELECT Resolved__c, Retry_Count__c
+            SELECT Resolved__c, Retry_Count__c, Last_Retry_At__c
             FROM Sync_Failure__c WHERE Id = :failure.Id
         ];
         System.assertEquals(false, updated.Resolved__c);
         System.assertEquals(3, updated.Retry_Count__c,
             'Retry count should increment on failure');
+        System.assertNotEquals(null, updated.Last_Retry_At__c,
+            'Last_Retry_At__c must be set even on failed retry');
     }
 
     @isTest

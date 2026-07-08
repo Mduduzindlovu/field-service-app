@@ -1,11 +1,13 @@
 public with sharing class CaseEventRetryScheduler implements Schedulable {
 
     public void execute(SchedulableContext ctx) {
+        // LIMIT 100 matches Salesforce's max callouts per transaction
         List<Sync_Failure__c> failures = [
             SELECT Id, Payload__c, Retry_Count__c
             FROM Sync_Failure__c
             WHERE Resolved__c = false
             AND Retry_Count__c < 5
+            LIMIT 100
         ];
 
         if (failures.isEmpty()) {
@@ -27,7 +29,7 @@ public with sharing class CaseEventRetryScheduler implements Schedulable {
         List<Sync_Failure__c> toUpdate = new List<Sync_Failure__c>();
 
         for (Sync_Failure__c failure : failures) {
-            String errorMsg = sendPayload(
+            String errorMsg = SyncCalloutUtil.sendPayload(
                 failure.Payload__c,
                 config.Endpoint_URL__c,
                 config.Sync_Secret__c
@@ -46,25 +48,5 @@ public with sharing class CaseEventRetryScheduler implements Schedulable {
         }
 
         update toUpdate;
-    }
-
-    private String sendPayload(String payload, String endpointUrl, String secret) {
-        HttpRequest req = new HttpRequest();
-        req.setEndpoint(endpointUrl);
-        req.setMethod('POST');
-        req.setHeader('Content-Type', 'application/json');
-        req.setHeader('x-sync-secret', secret);
-        req.setBody(payload);
-
-        try {
-            HttpResponse res = new Http().send(req);
-            if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
-                return null;
-            }
-            return 'HTTP ' + res.getStatusCode() + ': '
-                + res.getBody().abbreviate(200);
-        } catch (Exception e) {
-            return e.getMessage().abbreviate(255);
-        }
     }
 }
