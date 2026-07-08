@@ -6,13 +6,36 @@ public with sharing class CaseEventCallout implements Queueable, Database.Allows
     }
 
     public void execute(QueueableContext ctx) {
-        SyncConfig__mdt config = [
+        // NOTE: Salesforce allows max 100 callouts per transaction.
+        // Callers should batch events (≤50 per job) to stay within governor limits.
+
+        List<SyncConfig__mdt> configs = [
             SELECT Endpoint_URL__c, Sync_Secret__c
             FROM SyncConfig__mdt
             WHERE DeveloperName = 'FieldServiceSync'
             LIMIT 1
         ];
 
+        if (configs.isEmpty()) {
+            // CMDT record missing — log a failure for every event so nothing is silently lost
+            List<Sync_Failure__c> configFailures = new List<Sync_Failure__c>();
+            for (CaseStatusChanged__e evt : events) {
+                Sync_Failure__c f = new Sync_Failure__c();
+                f.Case_Id__c       = evt.Case_Id__c;
+                f.Payload__c       = buildPayload(evt);
+                f.Error_Message__c = 'SyncConfig__mdt record FieldServiceSync not found';
+                f.Failed_At__c     = Datetime.now();
+                f.Retry_Count__c   = 0;
+                f.Resolved__c      = false;
+                configFailures.add(f);
+            }
+            if (!configFailures.isEmpty()) {
+                insert configFailures;
+            }
+            return;
+        }
+
+        SyncConfig__mdt config = configs[0];
         List<Sync_Failure__c> failures = new List<Sync_Failure__c>();
 
         for (CaseStatusChanged__e evt : events) {
@@ -69,7 +92,7 @@ public with sharing class CaseEventCallout implements Queueable, Database.Allows
 
         try {
             HttpResponse res = new Http().send(req);
-            if (res.getStatusCode() == 200) {
+            if (res.getStatusCode() >= 200 && res.getStatusCode() < 300) {
                 return null;
             }
             return 'HTTP ' + res.getStatusCode() + ': '
