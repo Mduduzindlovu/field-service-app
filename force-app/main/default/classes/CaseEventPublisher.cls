@@ -7,7 +7,10 @@ public with sharing class CaseEventPublisher {
         List<Id> caseIdsToPublish = new List<Id>();
 
         for (Case c : newCases) {
-            // Skip Cases with no Location — they can't populate lat/lon
+            // Skip Cases with no Location — they can't populate lat/lon.
+            // This means a location-removal update (value → null) produces no event,
+            // which is intentional: a Case without a location is invisible to the
+            // dispatcher map and the Postgres cache regardless.
             if (c.Locations__c == null) {
                 continue;
             }

@@ -40,6 +40,8 @@ private class CaseEventPublisherTest {
         System.assertNotEquals(null, events[0].Case_Id__c);
         System.assertNotEquals(null, events[0].Latitude__c);
         System.assertNotEquals(null, events[0].Longitude__c);
+        System.assertNotEquals(null, events[0].Last_Modified_Date__c,
+            'Last_Modified_Date__c must always be populated — used as ordering guard in webhook receiver');
     }
 
     @isTest
