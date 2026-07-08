@@ -10,7 +10,7 @@ Salesforce is the system of record. A Next.js app (not yet built) will eventuall
 - [x] Phase 2 — Dispatcher console (map view of open Cases)
 - [x] Phase 3 — Platform Events (Case/Asset change → event)
 - [x] Phase 4 — Nuxt 3 + Postgres skeleton (Neon)
-- [ ] Phase 5 — Webhook receiver (Platform Event → Postgres sync)
+- [x] Phase 5 — Webhook receiver (Platform Event → Postgres sync)
 - [ ] Phase 6 — Technician-facing Next.js pages + Mapbox
 - [ ] Phase 7 — Write-back (technician completes job → Salesforce REST update)
 
