@@ -1,0 +1,41 @@
+<apex:page controller="CaseMapVFController" showHeader="false" standardStylesheets="false" applyHtmlTag="false">
+    <html>
+    <head>
+        <link href="{!URLFOR($Resource.mapboxgl, 'mapbox-gl.css')}" rel="stylesheet" />
+        <style>
+            body, html { margin: 0; padding: 0; height: 100%; }
+            #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script src="{!URLFOR($Resource.mapboxgl, 'mapbox-gl.js')}"></script>
+        <script>
+            var cases = JSON.parse('{!JSENCODE(casesJson)}');
+
+            mapboxgl.accessToken = '{!$Setup.MapboxConfig__c.Token__c}'; // TODO: move to Custom Setting before production use
+
+            var map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/light-v11',
+                center: [18.4241, -33.9249],
+                zoom: 11
+            });
+
+            cases.forEach(function (c) {
+                if (c.latitude && c.longitude) {
+                    new mapboxgl.Marker()
+                        .setLngLat([c.longitude, c.latitude])
+                        .setPopup(
+                            new mapboxgl.Popup().setHTML(
+                                '<strong>' + c.subject + '</strong><br/>' +
+                                c.locationName + '<br/>Status: ' + c.status
+                            )
+                        )
+                        .addTo(map);
+                }
+            });
+        </script>
+    </body>
+    </html>
+</apex:page>
