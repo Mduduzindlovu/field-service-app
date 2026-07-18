@@ -34,9 +34,9 @@ function dismissOverlay() {
 }
 
 // ── Mapbox ────────────────────────────────────────────────────────────────────
-// Public token — safe to expose client-side per Mapbox's own design.
-// TODO: move to Nuxt runtime config before any non-demo use.
-const MAPBOX_TOKEN = 'MAPBOX_TOKEN_PLACEHOLDER'
+// Token is read from NUXT_PUBLIC_MAPBOX_TOKEN env var (set in Vercel dashboard).
+const config = useRuntimeConfig()
+const MAPBOX_TOKEN = config.public.mapboxToken as string
 
 const mapRef = ref<HTMLDivElement | null>(null)
 let mapInstance: import('mapbox-gl').Map | null = null
