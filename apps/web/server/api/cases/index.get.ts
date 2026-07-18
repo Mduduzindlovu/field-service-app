@@ -2,31 +2,20 @@ import pool from '../../db/client'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
-  const technicianId = query.technicianId as string | undefined
+  const raw = query.technicianId
+  const technicianId = Array.isArray(raw) ? raw[0] : (raw ?? null)
 
   try {
-    let result
-    if (technicianId) {
-      result = await pool.query(
-        `SELECT id, case_number, subject, status,
-                technician_id, technician_name, scheduled_date,
-                location_name, latitude, longitude
-         FROM cases
-         WHERE technician_id = $1
-           AND status != 'Closed'
-         ORDER BY scheduled_date ASC NULLS LAST`,
-        [technicianId]
-      )
-    } else {
-      result = await pool.query(
-        `SELECT id, case_number, subject, status,
-                technician_id, technician_name, scheduled_date,
-                location_name, latitude, longitude
-         FROM cases
-         WHERE status != 'Closed'
-         ORDER BY scheduled_date ASC NULLS LAST`
-      )
-    }
+    const result = await pool.query(
+      `SELECT id, case_number, subject, status,
+              technician_id, technician_name, scheduled_date,
+              location_name, latitude, longitude
+       FROM cases
+       WHERE ($1::text IS NULL OR technician_id = $1)
+         AND status <> 'Closed'
+       ORDER BY scheduled_date ASC NULLS LAST`,
+      [technicianId]
+    )
 
     return result.rows.map((row) => ({
       id: row.id,
