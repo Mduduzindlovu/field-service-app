@@ -40,6 +40,7 @@ const MAPBOX_TOKEN = 'MAPBOX_TOKEN_PLACEHOLDER'
 
 const mapRef = ref<HTMLDivElement | null>(null)
 let mapInstance: import('mapbox-gl').Map | null = null
+let mapboxglRef: typeof import('mapbox-gl').default | null = null
 const markers: Map<string, import('mapbox-gl').Marker> = new Map()
 
 const CAPE_TOWN: [number, number] = [18.4241, -33.9249]
@@ -53,6 +54,7 @@ function initMap(caseList: Case[]) {
 
   // Dynamic import — client-side only
   import('mapbox-gl').then((mapboxgl) => {
+    mapboxglRef = mapboxgl.default
     mapboxgl.default.accessToken = MAPBOX_TOKEN
 
     mapInstance = new mapboxgl.default.Map({
@@ -134,13 +136,12 @@ function fitToCases(caseList: Case[]) {
     return
   }
 
-  import('mapbox-gl').then((mapboxgl) => {
-    const bounds = new mapboxgl.default.LngLatBounds()
-    for (const c of withCoords) {
-      bounds.extend([c.longitude!, c.latitude!])
-    }
-    mapInstance!.fitBounds(bounds, { padding: 60 })
-  })
+  if (!mapboxglRef) return
+  const bounds = new mapboxglRef.LngLatBounds()
+  for (const c of withCoords) {
+    bounds.extend([c.longitude!, c.latitude!])
+  }
+  mapInstance.fitBounds(bounds, { padding: 60 })
 }
 
 function flyToCase(c: Case) {
@@ -157,10 +158,8 @@ function scrollSidebarToCase(id: string) {
 
 // Re-plot pins when cases update from poll
 watch(cases, (newCases) => {
-  if (!mapInstance || !newCases) return
-  import('mapbox-gl').then((mapboxgl) => {
-    plotPins(newCases, mapboxgl.default)
-  })
+  if (!mapInstance || !newCases || !mapboxglRef) return
+  plotPins(newCases, mapboxglRef)
 })
 
 // Highlight pin when selection changes
@@ -184,6 +183,7 @@ onMounted(() => {
     clearInterval(interval)
     mapInstance?.remove()
     mapInstance = null
+    mapboxglRef = null
     markers.clear()
   })
 
@@ -266,7 +266,7 @@ function formatDate(d: string | null): string {
           :data-case-id="c.id"
           class="case-card"
           :class="{ 'case-card--selected': c.id === selectedCaseId }"
-          @click="selectCase(c.id); flyToCase(c)"
+          @click="selectCase(c.id)"
         >
           <div class="case-card-header">
             <span class="case-number">{{ c.caseNumber }}</span>
