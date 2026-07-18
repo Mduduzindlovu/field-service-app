@@ -23,18 +23,6 @@ const { data: cases, error, refresh } = await useAsyncData<Case[]>(
   { default: () => [], watch: [technicianId] }
 )
 
-// 30-second polling
-onMounted(() => {
-  const interval = setInterval(async () => {
-    try {
-      await refresh()
-    } catch {
-      // silently ignore poll failures — existing data stays on screen
-    }
-  }, 30_000)
-  onUnmounted(() => clearInterval(interval))
-})
-
 const selectedCaseId = ref<string | null>(null)
 
 function selectCase(id: string) {
@@ -44,6 +32,163 @@ function selectCase(id: string) {
 function dismissOverlay() {
   selectedCaseId.value = null
 }
+
+// ── Mapbox ────────────────────────────────────────────────────────────────────
+// Public token — safe to expose client-side per Mapbox's own design.
+// TODO: move to Nuxt runtime config before any non-demo use.
+const MAPBOX_TOKEN = 'MAPBOX_TOKEN_PLACEHOLDER'
+
+const mapRef = ref<HTMLDivElement | null>(null)
+let mapInstance: import('mapbox-gl').Map | null = null
+const markers: Map<string, import('mapbox-gl').Marker> = new Map()
+
+const CAPE_TOWN: [number, number] = [18.4241, -33.9249]
+
+function getCasesWithCoords(caseList: Case[]) {
+  return caseList.filter((c) => c.latitude !== null && c.longitude !== null)
+}
+
+function initMap(caseList: Case[]) {
+  if (!mapRef.value) return
+
+  // Dynamic import — client-side only
+  import('mapbox-gl').then((mapboxgl) => {
+    mapboxgl.default.accessToken = MAPBOX_TOKEN
+
+    mapInstance = new mapboxgl.default.Map({
+      container: mapRef.value!,
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: CAPE_TOWN,
+      zoom: 11,
+    })
+
+    mapInstance.on('load', () => {
+      plotPins(caseList, mapboxgl.default)
+      fitToCases(caseList)
+    })
+  })
+}
+
+function plotPins(caseList: Case[], mapboxgl: typeof import('mapbox-gl').default) {
+  if (!mapInstance) return
+
+  // Remove stale markers
+  const newIds = new Set(caseList.map((c) => c.id))
+  for (const [id, marker] of markers.entries()) {
+    if (!newIds.has(id)) {
+      marker.remove()
+      markers.delete(id)
+    }
+  }
+
+  for (const c of caseList) {
+    if (c.latitude === null || c.longitude === null) continue
+
+    if (markers.has(c.id)) {
+      // Update position in case it changed
+      markers.get(c.id)!.setLngLat([c.longitude, c.latitude])
+      continue
+    }
+
+    const el = document.createElement('div')
+    el.className = 'map-pin'
+    el.style.cssText = `
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #4F6AF5; border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3); cursor: pointer;
+    `
+
+    const marker = new mapboxgl.Marker({ element: el })
+      .setLngLat([c.longitude, c.latitude])
+      .addTo(mapInstance!)
+
+    el.addEventListener('click', () => {
+      selectCase(c.id)
+      scrollSidebarToCase(c.id)
+    })
+
+    markers.set(c.id, marker)
+  }
+
+  // Highlight selected
+  highlightSelectedPin()
+}
+
+function highlightSelectedPin() {
+  for (const [id, marker] of markers.entries()) {
+    const el = marker.getElement()
+    if (el) {
+      el.style.background = id === selectedCaseId.value ? '#e53e3e' : '#4F6AF5'
+      el.style.transform = id === selectedCaseId.value ? 'scale(1.4)' : 'scale(1)'
+    }
+  }
+}
+
+function fitToCases(caseList: Case[]) {
+  if (!mapInstance) return
+  const withCoords = getCasesWithCoords(caseList)
+  if (withCoords.length === 0) return
+
+  if (withCoords.length === 1) {
+    mapInstance.flyTo({ center: [withCoords[0].longitude!, withCoords[0].latitude!], zoom: 13 })
+    return
+  }
+
+  import('mapbox-gl').then((mapboxgl) => {
+    const bounds = new mapboxgl.default.LngLatBounds()
+    for (const c of withCoords) {
+      bounds.extend([c.longitude!, c.latitude!])
+    }
+    mapInstance!.fitBounds(bounds, { padding: 60 })
+  })
+}
+
+function flyToCase(c: Case) {
+  if (!mapInstance || c.latitude === null || c.longitude === null) return
+  mapInstance.flyTo({ center: [c.longitude, c.latitude], zoom: 14, duration: 800 })
+}
+
+function scrollSidebarToCase(id: string) {
+  nextTick(() => {
+    const el = document.querySelector(`[data-case-id="${id}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+// Re-plot pins when cases update from poll
+watch(cases, (newCases) => {
+  if (!mapInstance || !newCases) return
+  import('mapbox-gl').then((mapboxgl) => {
+    plotPins(newCases, mapboxgl.default)
+  })
+})
+
+// Highlight pin when selection changes
+watch(selectedCaseId, () => {
+  highlightSelectedPin()
+  if (selectedCaseId.value) {
+    const c = cases.value?.find((x) => x.id === selectedCaseId.value)
+    if (c) flyToCase(c)
+  }
+})
+
+onMounted(() => {
+  const interval = setInterval(async () => {
+    try {
+      await refresh()
+    } catch {
+      // silently ignore poll failures — existing data stays on screen
+    }
+  }, 30_000)
+  onUnmounted(() => {
+    clearInterval(interval)
+    mapInstance?.remove()
+    mapInstance = null
+    markers.clear()
+  })
+
+  if (cases.value) initMap(cases.value)
+})
 
 const selectedCase = computed(() =>
   cases.value?.find((c) => c.id === selectedCaseId.value) ?? null
@@ -118,9 +263,10 @@ function formatDate(d: string | null): string {
         <li
           v-for="c in cases"
           :key="c.id"
+          :data-case-id="c.id"
           class="case-card"
           :class="{ 'case-card--selected': c.id === selectedCaseId }"
-          @click="selectCase(c.id)"
+          @click="selectCase(c.id); flyToCase(c)"
         >
           <div class="case-card-header">
             <span class="case-number">{{ c.caseNumber }}</span>
@@ -136,7 +282,7 @@ function formatDate(d: string | null): string {
 
     <!-- Map area -->
     <main class="map-area">
-      <div id="map" class="map-container" />
+      <div ref="mapRef" id="map" class="map-container" />
 
       <!-- Bottom overlay -->
       <div v-if="selectedCase" class="map-overlay">
