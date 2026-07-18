@@ -64,7 +64,7 @@ Full-viewport split layout, no page scroll.
 - Mapbox GL JS, client-side only (`if (process.client)`)
 - Style: `mapbox://styles/mapbox/light-v11`
 - Default centre: Cape Town (`[-33.9249, 18.4241]`), zoom 11
-- On load: fits bounding box of all case coordinates (if any)
+- On load: fits bounding box of all case coordinates if 2+ cases with coordinates exist; if exactly 1, centres on it at zoom 13; if none, uses Cape Town default
 - Each case with lat/lon = a map pin marker
 - Pin click: flies to pin, opens bottom overlay, highlights sidebar card
 - Selected pin: distinct colour vs unselected
