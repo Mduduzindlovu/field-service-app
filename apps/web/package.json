@@ -8,10 +8,12 @@
     "preview": "nuxt preview"
   },
   "dependencies": {
+    "mapbox-gl": "^3.26.0",
     "nuxt": "^3.13.0",
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@types/mapbox-gl": "^3.4.1",
     "@types/pg": "^8.11.10"
   }
 }
