@@ -16,11 +16,11 @@ const route = useRoute()
 const technicianId = computed(() => route.query.technicianId as string | undefined)
 
 const { data: cases, error, refresh } = await useAsyncData<Case[]>(
-  'cases',
+  () => `cases-${technicianId.value ?? 'all'}`,
   () => $fetch('/api/cases', {
     query: technicianId.value ? { technicianId: technicianId.value } : {}
   }),
-  { default: () => [] }
+  { default: () => [], watch: [technicianId] }
 )
 
 // 30-second polling
@@ -110,7 +110,7 @@ function formatDate(d: string | null): string {
         Unable to load cases
       </div>
 
-      <div v-else-if="!cases || cases.length === 0" class="sidebar-empty">
+      <div v-else-if="cases.length === 0" class="sidebar-empty">
         No cases available yet
       </div>
 
@@ -141,7 +141,7 @@ function formatDate(d: string | null): string {
       <!-- Bottom overlay -->
       <div v-if="selectedCase" class="map-overlay">
         <div class="map-overlay-inner">
-          <button class="overlay-close" @click="dismissOverlay">✕</button>
+          <button class="overlay-close" aria-label="Dismiss" @click="dismissOverlay">✕</button>
           <div class="overlay-header">
             <span class="case-number">{{ selectedCase.caseNumber }}</span>
             <span class="badge" :class="statusBadgeClass(selectedCase.status)">{{ selectedCase.status }}</span>
